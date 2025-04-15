@@ -4,23 +4,31 @@
 
 ## 功能特点
 
-- 在资源管理器上下文菜单中添加"用 Cygwin 打开"选项
+- 在资源管理器上下文菜单中添加 Cygwin 终端选项
+- 支持两种终端模式：
+  - VS Code 集成终端
+  - 外部 Cygwin 终端
 - 支持文件夹和文件（对于文件会在其所在目录中打开）
 - 自动将 Windows 路径转换为 Cygwin 路径
 - 在选定位置打开 Cygwin 终端
 - 支持所有 Windows 驱动器（C:, D: 等）的正确路径映射
 - 使用 mintty 终端模拟器（Cygwin 自带）
 - 正确处理路径中的空格和特殊字符
+- 灵活的菜单配置选项
 
 ![用 Cygwin 打开](images/open-with-cygwin.png)
 
 ## 使用方法
 
 1. 在 VS Code 的资源管理器中右键点击任意文件夹或文件
-2. 从上下文菜单中选择"用 Cygwin 打开"
-3. Cygwin 终端将会打开：
-   - 对于文件夹：终端会在选定目录中打开
-   - 对于文件：终端会在文件的父目录中打开
+2. 从上下文菜单中选择 Cygwin 终端选项：
+   - 如果启用了子菜单（默认），你可以选择：
+     - "在集成终端中打开"：在 VS Code 的集成终端中打开
+     - "在外部终端中打开"：打开独立的 Cygwin 终端窗口
+   - 如果禁用了子菜单，将使用配置的默认终端类型
+3. Cygwin 终端将会打开并自动导航到：
+   - 对于文件夹：选定的目录
+   - 对于文件：文件所在的目录
 
 ### 路径转换示例：
 - `C:\Users\Administrator` → `/cygdrive/c/Users/Administrator`
@@ -29,21 +37,39 @@
 
 ## 系统要求
 
+- Windows 操作系统
+- VS Code 1.80.0 或更高版本
 - 系统中必须安装 Cygwin（默认路径：C:\cygwin64）
-- 必须安装 mintty 终端模拟器（Cygwin 自带）
+- 如果使用外部终端模式，需要安装 mintty 终端模拟器（Cygwin 默认已安装）
 
 ## 扩展设置
 
 本扩展提供以下设置选项：
 
 * `cygwinTerminal.path`：Cygwin bash 可执行文件的路径（默认值：`"C:\\cygwin64\\bin\\bash.exe"`）
+* `cygwinTerminal.args`：Cygwin 终端的额外启动参数（默认值：`["--login", "-i"]`）
+* `cygwinTerminal.showSubmenu`：是否显示终端类型选择子菜单（默认值：`true`）
+* `cygwinTerminal.defaultTerminalType`：当子菜单禁用时的默认终端类型（默认值：`"integrated"`）
+  - `"integrated"`：使用 VS Code 集成终端
+  - `"outer"`：使用外部 Cygwin 终端
 
 ## 详细功能
 
-### 终端模拟器
-- 使用 mintty 终端模拟器（Cygwin 自带）
-- 支持完整的终端功能和 Unicode 字符
-- 提供良好的终端体验和兼容性
+### 终端选项
+- 支持 VS Code 集成终端模式
+  - 直接在 VS Code 内部打开
+  - 与其他 VS Code 终端共享环境
+  - 支持终端切换和管理
+- 支持外部 Cygwin 终端模式
+  - 使用 mintty 终端模拟器
+  - 独立的终端窗口
+  - 完整的终端功能和 Unicode 支持
+
+### 菜单配置
+- 灵活的菜单显示选项
+  - 可选的子菜单模式
+  - 可配置的默认终端类型
+  - 清晰的命令组织结构
 
 ### 路径处理
 - 强大的 Windows 到 Cygwin 格式的路径转换
@@ -52,13 +78,16 @@
 - 支持网络驱动器和 UNC 路径
 
 ### 进程管理
-- 使用分离进程模式确保终端独立性
+- 集成终端模式下的 VS Code 进程管理
+- 外部终端模式下的独立进程控制
 - 正确处理环境变量
 - 清理进程终止
 
 ## 已知问题
 
-- 必须安装 mintty（Cygwin 默认已安装）
+- 外部终端模式需要 mintty（Cygwin 默认已安装）
+- 某些特殊的 UNC 路径可能需要额外的路径转换处理
+- 在某些情况下，环境变量可能需要手动配置
 
 ## 版本说明
 
@@ -117,6 +146,55 @@ npm install
 - `npm run compile` - 编译 TypeScript 代码
 - `npm run lint` - 运行代码检查
 - `npm run test` - 运行测试用例
+- `npm run package` - 构建生产环境代码
+
+### 打包和发布
+
+1. 安装 vsce 工具（如果尚未安装）：
+```bash
+npm install -g @vscode/vsce
+```
+
+2. 构建 VSIX 包：
+```bash
+# 首先构建生产环境代码
+npm run package
+
+# 然后使用 vsce 打包
+vsce package
+```
+这将在项目根目录生成 `cygwin-terminal-0.0.1.vsix` 文件（版本号以 package.json 中的版本为准）
+
+3. 安装 VSIX 包：
+   - 方法一：在 VS Code 中
+     1. 按 Ctrl+Shift+P 打开命令面板
+     2. 输入 "Extensions: Install from VSIX"
+     3. 选择生成的 VSIX 文件
+   - 方法二：使用命令行
+     ```bash
+     code --install-extension cygwin-terminal-0.0.1.vsix
+     ```
+
+4. 发布到 VS Code Marketplace（需要有发布权限）：
+   - 方法一：手动上传
+     1. 登录 [Visual Studio Marketplace](https://marketplace.visualstudio.com/)
+     2. 上传生成的 VSIX 包
+   - 方法二：使用命令行
+     ```bash
+     # 需要先创建 Personal Access Token (PAT)
+     vsce login <publisher>
+     vsce publish
+     ```
+     或者直接使用 PAT：
+     ```bash
+     vsce publish -p <access-token>
+     ```
+
+注意：发布前请确保：
+1. package.json 中的版本号已更新
+2. CHANGELOG.md 已更新
+3. README.md 文档已更新
+4. 所有测试用例都已通过
 
 ### 调试扩展
 

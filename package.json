@@ -3,6 +3,11 @@
   "displayName": "Cygwin Terminal",
   "description": "Open Cygwin terminal from VS Code Explorer context menu",
   "version": "0.0.1",
+  "icon": "images/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/luozhiqiang-code/cygwin-terminal.git"
+  },
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -11,25 +16,56 @@
   ],
   "activationEvents": [
     "onStartupFinished",
-    "*"
+    "onCommand:cygwin-terminal.openIntegratedTerminal",
+    "onCommand:cygwin-terminal.openOuterTerminal"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "cygwin-terminal.openTerminal",
-        "title": "Open with Cygwin"
+        "command": "cygwin-terminal.openIntegratedTerminal",
+        "title": "Open in Integrated Terminal"
+      },
+      {
+        "command": "cygwin-terminal.openOuterTerminal",
+        "title": "Open in Outer Terminal"
       }
     ],
     "menus": {
       "explorer/context": [
         {
-          "when": "explorerResourceIsFolder || resourceScheme == file",
-          "command": "cygwin-terminal.openTerminal",
+          "when": "explorerResourceIsFolder || resourceScheme == file && config.cygwinTerminal.showSubmenu",
+          "submenu": "cygwin-terminal.submenu",
           "group": "navigation@1"
+        },
+        {
+          "when": "explorerResourceIsFolder || resourceScheme == file && !config.cygwinTerminal.showSubmenu && config.cygwinTerminal.defaultTerminalType == 'integrated'",
+          "command": "cygwin-terminal.openIntegratedTerminal",
+          "group": "navigation@1"
+        },
+        {
+          "when": "explorerResourceIsFolder || resourceScheme == file && !config.cygwinTerminal.showSubmenu && config.cygwinTerminal.defaultTerminalType == 'outer'",
+          "command": "cygwin-terminal.openOuterTerminal",
+          "group": "navigation@1"
+        }
+      ],
+      "cygwin-terminal.submenu": [
+        {
+          "command": "cygwin-terminal.openIntegratedTerminal",
+          "group": "1_terminal@1"
+        },
+        {
+          "command": "cygwin-terminal.openOuterTerminal",
+          "group": "1_terminal@2"
         }
       ]
     },
+    "submenus": [
+      {
+        "id": "cygwin-terminal.submenu",
+        "label": "Open with Cygwin"
+      }
+    ],
     "configuration": {
       "title": "Cygwin Terminal",
       "properties": {
@@ -42,6 +78,17 @@
           "type": "array",
           "default": ["--login", "-i"],
           "description": "Additional arguments for Cygwin terminal"
+        },
+        "cygwinTerminal.showSubmenu": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show submenu options for integrated and outer terminal"
+        },
+        "cygwinTerminal.defaultTerminalType": {
+          "type": "string",
+          "enum": ["integrated", "outer"],
+          "default": "integrated",
+          "description": "Default terminal type when submenu is disabled"
         }
       }
     }
@@ -61,7 +108,7 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.99.0",
+    "@types/vscode": "^1.80.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
     "@typescript-eslint/eslint-plugin": "^8.28.0",

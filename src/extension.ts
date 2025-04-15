@@ -44,115 +44,108 @@ export function activate(context: vscode.ExtensionContext) {
 		return `/cygdrive/${drive}/${remainingPath}`;
 	}
 
-	let disposable = vscode.commands.registerCommand('cygwin-terminal.openTerminal', async (uri: vscode.Uri) => {
-		// 获取配置
-		const config = vscode.workspace.getConfiguration('cygwinTerminal');
+	// 创建集成终端
+	async function createIntegratedTerminal(cygwinPath: string, folderPath: string) {
+		const terminal = vscode.window.createTerminal({
+			name: 'Cygwin',
+			shellPath: cygwinPath,
+			shellArgs: ['--login', '-i'],
+			cwd: folderPath,
+			env: {
+				CHERE_INVOKING: "1",
+				CYGWIN: "nodosfilewarning"
+			}
+		});
+		terminal.show();
+		return terminal;
+	}
+
+	// 创建外部终端
+	async function createOuterTerminal(uri: vscode.Uri, config: vscode.WorkspaceConfiguration) {
 		const cygwinPath = config.get<string>('path') || 'C:\\cygwin64\\bin\\bash.exe';
+		const cygwinRoot = path.dirname(path.dirname(cygwinPath));
+		const minttyPath = path.join(cygwinRoot, 'bin', 'mintty.exe');
+
+		if (!fs.existsSync(minttyPath)) {
+			throw new Error('Mintty not found. Please make sure Cygwin is properly installed.');
+		}
+
+		const selectedPath = uri.fsPath;
+		const folderPath = fs.statSync(selectedPath).isDirectory() ? 
+			selectedPath : 
+			path.dirname(selectedPath);
 		
-		console.log('Debug: Cygwin path:', cygwinPath);
+		const cygwinFolderPath = convertToCygwinPath(folderPath);
 		
+		const baseEnv = {
+			...process.env,
+			CHERE_INVOKING: "1",
+			CYGWIN: "nodosfilewarning",
+			CYGWIN_ROOT: cygwinRoot
+		};
+
+		const minttyArgs = [
+			'-i', '/Cygwin-Terminal.ico',
+			'--dir', cygwinFolderPath,
+			'-'
+		];
+
+		const terminal = spawn(minttyPath, minttyArgs, {
+			detached: true,
+			stdio: ['ignore', 'ignore', 'ignore'],
+			windowsHide: false,
+			shell: false,
+			cwd: path.join(cygwinRoot, 'bin'),
+			env: baseEnv
+		});
+
+		terminal.on('error', (err: Error) => {
+			console.error('Debug: Terminal error:', err);
+			vscode.window.showErrorMessage(`Failed to open Cygwin terminal: ${err.message}`);
+		});
+
+		terminal.unref();
+	}
+
+	// 注册集成终端命令
+	let integratedTerminalDisposable = vscode.commands.registerCommand('cygwin-terminal.openIntegratedTerminal', async (uri: vscode.Uri) => {
 		try {
-			// 检查 Cygwin 是否存在
+			const config = vscode.workspace.getConfiguration('cygwinTerminal');
+			const cygwinPath = config.get<string>('path') || 'C:\\cygwin64\\bin\\bash.exe';
+
 			if (!fs.existsSync(cygwinPath)) {
 				throw new Error(`Cygwin executable not found at: ${cygwinPath}`);
 			}
 
-			// 获取 Cygwin 根目录和 mintty 路径
-			const cygwinRoot = path.dirname(path.dirname(cygwinPath));
-			const minttyPath = path.join(cygwinRoot, 'bin', 'mintty.exe');
-			console.log('Debug: Checking for mintty at:', minttyPath);
-
-			// 获取选中的目录路径并转换
 			const selectedPath = uri.fsPath;
-			console.log('Debug: Selected path:', selectedPath);
-			
-			// 检查路径是否存在
 			if (!fs.existsSync(selectedPath)) {
 				throw new Error(`Selected path does not exist: ${selectedPath}`);
 			}
-			
-			// 如果选中的是文件，使用其所在目录
+
 			const folderPath = fs.statSync(selectedPath).isDirectory() ? 
 				selectedPath : 
 				path.dirname(selectedPath);
-			console.log('Debug: Target folder path:', folderPath);
-			
-			// 转换为 Cygwin 路径
-			const cygwinFolderPath = convertToCygwinPath(folderPath);
-			console.log('Debug: Converted Cygwin path:', cygwinFolderPath);
-			
-			// 基本环境变量配置
-			const baseEnv = {
-				...process.env,
-				CHERE_INVOKING: "1",
-				CYGWIN: "nodosfilewarning",
-				CYGWIN_ROOT: cygwinRoot
-			};
-			
-			let terminal;
-			
-			if (fs.existsSync(minttyPath)) {
-				// 使用 mintty
-				console.log('Debug: Using mintty');
-				const minttyArgs = [
-					'-i', '/Cygwin-Terminal.ico',
-					'--dir', cygwinFolderPath,
-					'-'
-				];
-				
-				console.log('Debug: Mintty command args:', minttyArgs);
-				
-				terminal = spawn(minttyPath, minttyArgs, {
-					detached: true,
-					stdio: ['ignore', 'ignore', 'ignore'],
-					windowsHide: false,
-					shell: false,
-					cwd: path.join(cygwinRoot, 'bin'),
-					env: baseEnv
-				});
 
-				if (!terminal) {
-					throw new Error('Terminal process creation failed');
-				}
-				
-				console.log('Debug: Terminal spawn successful');
-				
-				if (!terminal.pid) {
-					throw new Error('Terminal process started but no PID assigned');
-				}
-				
-				console.log('Debug: Terminal process started with PID:', terminal.pid);
-				
-				// 处理错误
-				terminal.on('error', (err: Error) => {
-					console.error('Debug: Terminal error:', err);
-					console.error('Debug: Error stack:', err.stack);
-					vscode.window.showErrorMessage(`Failed to open Cygwin terminal: ${err.message}`);
-				});
-				
-				// 处理进程退出
-				terminal.on('exit', (code: number | null, signal: NodeJS.Signals | null) => {
-					console.log('Debug: Terminal process exited with code:', code);
-					console.log('Debug: Terminal process exit signal:', signal);
-					if (code !== 0) {
-						vscode.window.showErrorMessage(`Cygwin terminal process exited with code: ${code}, signal: ${signal}`);
-					}
-				});
-				
-				// 分离进程
-				terminal.unref();
-				console.log('Debug: Terminal process detached');
-			} else {
-				throw new Error('Mintty not found. Please make sure Cygwin is properly installed.');
-			}
-			
+			await createIntegratedTerminal(cygwinPath, folderPath);
 		} catch (error) {
 			console.error('Debug: Caught error:', error);
 			vscode.window.showErrorMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
 		}
 	});
 
-	context.subscriptions.push(disposable);
+	// 注册外部终端命令
+	let outerTerminalDisposable = vscode.commands.registerCommand('cygwin-terminal.openOuterTerminal', async (uri: vscode.Uri) => {
+		try {
+			const config = vscode.workspace.getConfiguration('cygwinTerminal');
+			await createOuterTerminal(uri, config);
+		} catch (error) {
+			console.error('Debug: Caught error:', error);
+			vscode.window.showErrorMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	});
+
+	context.subscriptions.push(integratedTerminalDisposable);
+	context.subscriptions.push(outerTerminalDisposable);
 }
 
 // This method is called when your extension is deactivated
