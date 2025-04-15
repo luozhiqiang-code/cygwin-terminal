@@ -1,23 +1,50 @@
 {
   "name": "cygwin-terminal",
-  "displayName": "cygwin-terminal",
-  "description": "a plugin used for opening cygwin terminal with selected path",
+  "displayName": "Cygwin Terminal",
+  "description": "Open Cygwin terminal from VS Code Explorer context menu",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.99.0"
+    "vscode": "^1.80.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished",
+    "*"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "cygwin-terminal.helloWorld",
-        "title": "Hello World"
+        "command": "cygwin-terminal.openTerminal",
+        "title": "Open with Cygwin"
       }
-    ]
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "when": "explorerResourceIsFolder || resourceScheme == file",
+          "command": "cygwin-terminal.openTerminal",
+          "group": "navigation@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Cygwin Terminal",
+      "properties": {
+        "cygwinTerminal.path": {
+          "type": "string",
+          "default": "C:\\cygwin64\\bin\\bash.exe",
+          "description": "Path to Cygwin bash executable"
+        },
+        "cygwinTerminal.args": {
+          "type": "array",
+          "default": ["--login", "-i"],
+          "description": "Additional arguments for Cygwin terminal"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
